@@ -20,7 +20,7 @@ ssh ec2-user@<Amazon Linux2のパブリックIPアドレス>
 sudo /usr/bin/bash
 ps -fH
 ```
-### (2)Console2 でホストから見たプロセスの状態を確認する
+### (2)Console2 で親プロセス(ホスト)から見たプロセスの状態を確認する
 Console1とConsole2でpsコマンドで確認した時に、プロセスツリーやbashプロセスのPIDが一致していることが確認できます。
 ```shell
 #Console2
@@ -114,11 +114,11 @@ ps -efH
   nfsnobo+     2     0  0 12:22 ?        00:00:00 [kthreadd]
   nfsnobo+     4     2  0 12:22 ?        00:00:00   [kworker/0:0H]
   中略
-  nfsnobo+  1121  3469  0 14:14 ?        00:00:00     sshd: ec2-user [priv]
-  nfsnobo+  1155  1121  0 14:14 ?        00:00:00       sshd: ec2-user@pts/2
-  nfsnobo+  1156  1155  0 14:14 pts/2    00:00:00         -bash
-  nfsnobo+  1180  1156  0 14:14 pts/2    00:00:00           unshare --user --fork /usr/bin/bash
-  nfsnobo+  1181  1180  0 14:14 pts/2    00:00:00             /usr/bin/bash
+  nfsnobo+  1900  3469  0 15:13 ?        00:00:00     sshd: ec2-user [priv]
+  nfsnobo+  1934  1900  0 15:13 ?        00:00:00       sshd: ec2-user@pts/2
+  nfsnobo+  1935  1934  0 15:13 pts/2    00:00:00         -bash
+  nfsnobo+  1958  1935  0 15:14 pts/2    00:00:00           unshare --user --fork /usr/bin/bash
+  nfsnobo+  1959  1958  0 15:14 pts/2    00:00:00             /usr/bin/bash
   以下略
   ```
 - Console2実行例
@@ -128,19 +128,73 @@ ps -efH
   root         2     0  0 12:22 ?        00:00:00 [kthreadd]
   root         4     2  0 12:22 ?        00:00:00   [kworker/0:0H]
   中略
-  root      1121  3469  0 14:14 ?        00:00:00     sshd: ec2-user [priv]
-  ec2-user  1155  1121  0 14:14 ?        00:00:00       sshd: ec2-user@pts/2
-  ec2-user  1156  1155  0 14:14 pts/2    00:00:00         -bash
-  ec2-user  1180  1156  0 14:14 pts/2    00:00:00           unshare --user --fork /usr/bin/bash
-  ec2-user  1181  1180  0 14:14 pts/2    00:00:00             /usr/bin/bash
+  root      1900  3469  0 15:13 ?        00:00:00     sshd: ec2-user [priv]
+  ec2-user  1934  1900  0 15:13 ?        00:00:00       sshd: ec2-user@pts/2
+  ec2-user  1935  1934  0 15:13 pts/2    00:00:00         -bash
+  ec2-user  1958  1935  0 15:14 pts/2    00:00:00           unshare --user --fork /usr/bin/bash
+  ec2-user  1959  1958  0 15:14 pts/2    00:00:00             /usr/bin/bash
+  以下略
   ```
 ### (4) Console2 新しいユーザー名前空間で実行ユーザをrootにマッピングする
 Console1のidコマンドの通り、ユーザー名前空間の作成だけでは、`UID`/`GID`とも`65534`(nfsnobody)にしかならない。
-そこで親(ホスト)のユーザ名前空間と新しいユーザー名前空間の間でのユーザマッピングを行います。ここではプロセスを起動したユーザ(ec2-uerユーザー/UID=1000を、rootユーザ/UID=0)
+そこで親(ホスト)のユーザ名前空間と新しいユーザー名前空間の間でのユーザマッピングを行います。ここではプロセスを起動したec2-uerユーザー(UID=1000)を、rootユーザ(UID=0)にマッピングします。
 ```shell
 #Console２
 ChildPID=<unshareから起動した/usr/bin/bashのPIDを設定>
+ExeUID=$(id -u)
+ExeGID=$(id -g)
+echo ${ChildPID} ${ExeUID} ${ExeGID}
 
+#マッピング情報の変更
+echo deny > /proc/${ChildPID}/setgroups
+echo "0 ${ExeUID} 1" > /proc/${ChildPID}/uid_map
+echo "0 ${ExeGID} 1" > /proc/${ChildPID}/gid_map
+```
+### (5) Console1/2 idコマンド/psコマンドでマッピング後のユーザ状態を確認する
+- Console1実行例
+  ```shell
+  $ id
+  uid=0(root) gid=0(root) groups=0(root),65534(nfsnobody)
+  
+  $ ps -efH
+  UID        PID  PPID  C STIME TTY          TIME CMD
+  nfsnobo+     2     0  0 12:22 ?        00:00:00 [kthreadd]
+  nfsnobo+     4     2  0 12:22 ?        00:00:00   [kworker/0:0H]
+  中略
+  nfsnobo+  1900  3469  0 15:13 ?        00:00:00     sshd: ec2-user [priv]
+  root      1934  1900  0 15:13 ?        00:00:00       sshd: ec2-user@pts/2
+  root      1935  1934  0 15:13 pts/2    00:00:00         -bash
+  root      1958  1935  0 15:14 pts/2    00:00:00           unshare --user --fork /usr/bin/bash
+  root      1959  1958  0 15:14 pts/2    00:00:00             /usr/bin/bash
+  以下略
+  ```
+- Console2実行例
+  ```shell
+  $ ps -efH
+  UID        PID  PPID  C STIME TTY          TIME CMD
+  root         2     0  0 12:22 ?        00:00:00 [kthreadd]
+  root         4     2  0 12:22 ?        00:00:00   [kworker/0:0H]
+  中略
+  root      1900  3469  0 15:13 ?        00:00:00     sshd: ec2-user [priv]
+  ec2-user  1934  1900  0 15:13 ?        00:00:00       sshd: ec2-user@pts/2
+  ec2-user  1935  1934  0 15:13 pts/2    00:00:00         -bash
+  ec2-user  1958  1935  0 15:14 pts/2    00:00:00           unshare --user --fork /usr/bin/bash
+  ec2-user  1959  1958  0 15:14 pts/2    00:00:00             /usr/bin/bash
+  以下略
+  ```
+### (5) Console1 unshareコマンドでrootへのユーザマッピングを試す
+(4)〜(5)のユーザマッピングの処理と同じことを、`unshareコマンド`の`--map-root-user`オプションで実現することができます。
+```shell
+#次の作業のために一旦bashを終了します。
+exit
+id   #ec2-userに戻っていることを確認します。
+
+#unshareコマンドでrootユーザのマッピングもまとめて実施
+unshare --user --map-root-user --fork /usr/bin/bash
+
+id
+ps -efH
+```
 
 
 unshareのコマンドを確認する
