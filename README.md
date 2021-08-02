@@ -288,16 +288,50 @@ ps -efH
 
 ## Step.4 マウントポイントを分離する
 
+```shell
+NEW_ROOT="./container_mnt/"
+ROOTFS_FILE="./rootfs.dat"
 
-fallocate -l 100M rootfs.dat
-mkfs -t xfs rootfs.dat
-mkdir container_mnt
-sudo mount -t xfs -o loop ./rootfs.dat ./container_mnt/
+cd ~
+fallocate -l 1G ${ROOTFS_FILE}
+mkfs -t xfs ${ROOTFS_FILE}
+mkdir ${NEW_ROOT}
+sudo mount -t xfs -o loop ${ROOTFS_FILE} ${NEW_ROOT}
+sudo chown -R ec2-user:ec2-user ${NEW_ROOT}
+
+
+mkdir ${NEW_ROOT}/{usr,etc,proc}
+cp -a /usr/bin /usr/sbin /usr/lib /usr/lib64 ${NEW_ROOT}/usr
+cp -a /lib /lib64 /bin ${NEW_ROOT}/
+cp /etc/{passwd,group,filesystems} ${NEW_ROOT}/
+mkdir ${NEW_ROOT}/.old
+
+
+
+unshare --user --map-root-user --uts --pid --fork --mount /usr/bin/bash
+mount --bind ${NEW_ROOT} ${NEW_ROOT}
+mount -t proc proc $NEW_ROOT/proc
+
+cd ${NEW_ROOT}
+pivot_root ${NEW_ROOT} ${NEW_ROOT}/.old
+
+umount -l 
+
+
+pivot_root . .old
+
+
+chroot .
+mount -t proc proc /proc
+
 
 sudo  cp -aR /usr/ /lib /lib64 /etc /var ./container_mnt/
 
+/lib /lib64 /etc /var ./container_mnt/
 
+```
 
 
 https://www.youtube.com/watch?v=8fi7uSYlOdc
 https://tech.retrieva.jp/entry/2019/06/04/130134
+https://blog.framinal.life/entry/2020/04/09/183208
