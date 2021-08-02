@@ -278,3 +278,4 @@ ps -efH
 
 
 https://www.youtube.com/watch?v=8fi7uSYlOdc
+https://tech.retrieva.jp/entry/2019/06/04/130134
