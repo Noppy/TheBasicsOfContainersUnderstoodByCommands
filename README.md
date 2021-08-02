@@ -287,51 +287,51 @@ ps -efH
 
 
 ## Step.4 マウントポイントを分離する
-
+### (1)ファイルシステムの作成とデータコピー
 ```shell
 NEW_ROOT="./container_mnt/"
 ROOTFS_FILE="./rootfs.dat"
+echo ${NEW_ROOT} ${ROOTFS_FILE}
 
 cd ~
-fallocate -l 1G ${ROOTFS_FILE}
+fallocate -l 2G ${ROOTFS_FILE}
 mkfs -t xfs ${ROOTFS_FILE}
 mkdir ${NEW_ROOT}
 sudo mount -t xfs -o loop ${ROOTFS_FILE} ${NEW_ROOT}
 sudo chown -R ec2-user:ec2-user ${NEW_ROOT}
 
 
-mkdir ${NEW_ROOT}/{usr,etc,proc}
-cp -a /usr/bin /usr/sbin /usr/lib /usr/lib64 ${NEW_ROOT}/usr
+mkdir ${NEW_ROOT}/{usr,etc,proc,dev}
+cp -a /usr/bin /usr/sbin /usr/lib /usr/lib64 /usr/libexec /usr/share ${NEW_ROOT}/usr
 cp -a /lib /lib64 /bin ${NEW_ROOT}/
 cp /etc/{passwd,group,filesystems} ${NEW_ROOT}/
-mkdir ${NEW_ROOT}/.old
 
+sudo cp -a /root ${NEW_ROOT}/root
+sudo chown -R ec2-user:ec2-user ${NEW_ROOT}/root
 
-
+sudo mknod -m 666 ${NEW_ROOT}/dev/null c 1 3
+sudo mknod -m 666 ${NEW_ROOT}/dev/zero c 1 5
+sudo chown -R ec2-user:ec2-user ${NEW_ROOT}/dev/
+```
+### (2)新しいマウント名前空間でのプロセス起動とchroot
+```shell
+#新しいマウント名前空間でプロセスを起動する
 unshare --user --map-root-user --uts --pid --fork --mount /usr/bin/bash
-mount --bind ${NEW_ROOT} ${NEW_ROOT}
-mount -t proc proc $NEW_ROOT/proc
 
-cd ${NEW_ROOT}
-pivot_root ${NEW_ROOT} ${NEW_ROOT}/.old
+#rootfsの変更作業
+NEW_ROOT="./container_mnt/"
+mkdir -p ${NEW_ROOT}.old
 
-umount -l 
+mount --bind ${NEW_ROOT} ${NEW_ROOT}     #rootマウントのバインド
+pivot_root ${NEW_ROOT} ${NEW_ROOT}/.old  #カレンとプロセスのrootファイルシステム変更
 
+mount -t proc proc ${NEW_ROOT}/proc      #/procを利用できるようにマウント
 
-pivot_root . .old
-
-
-chroot .
-mount -t proc proc /proc
-
-
-sudo  cp -aR /usr/ /lib /lib64 /etc /var ./container_mnt/
-
-/lib /lib64 /etc /var ./container_mnt/
-
+cd ${NEW_ROOT}                           #chroot先への移動
+exec chroot . /usr/bin/bash            　　　　#chrootの実行
 ```
 
-
+# リファレンス
 https://www.youtube.com/watch?v=8fi7uSYlOdc
 https://tech.retrieva.jp/entry/2019/06/04/130134
 https://blog.framinal.life/entry/2020/04/09/183208
