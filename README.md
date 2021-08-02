@@ -94,7 +94,7 @@ unshareコマンドを利用して、新しいユーザ名前空間を作成しb
 実行したら、idコマンドとpsコマンドで実行ユーザやプロセスの状態を確認してみます。
 ```shell
 #Console1
-unshare --user --fork /usr/bin/bash
+unshare --user /usr/bin/bash
 id
 ps -efH
 ```
@@ -114,11 +114,9 @@ ps -efH
   nfsnobo+     2     0  0 12:22 ?        00:00:00 [kthreadd]
   nfsnobo+     4     2  0 12:22 ?        00:00:00   [kworker/0:0H]
   中略
-  nfsnobo+  1900  3469  0 15:13 ?        00:00:00     sshd: ec2-user [priv]
   nfsnobo+  1934  1900  0 15:13 ?        00:00:00       sshd: ec2-user@pts/2
   nfsnobo+  1935  1934  0 15:13 pts/2    00:00:00         -bash
-  nfsnobo+  1958  1935  0 15:14 pts/2    00:00:00           unshare --user --fork /usr/bin/bash
-  nfsnobo+  1959  1958  0 15:14 pts/2    00:00:00             /usr/bin/bash
+  nfsnobo+  2261  1935  0 15:37 pts/2    00:00:00           /usr/bin/bash
   以下略
   ```
 - Console2実行例
@@ -131,8 +129,7 @@ ps -efH
   root      1900  3469  0 15:13 ?        00:00:00     sshd: ec2-user [priv]
   ec2-user  1934  1900  0 15:13 ?        00:00:00       sshd: ec2-user@pts/2
   ec2-user  1935  1934  0 15:13 pts/2    00:00:00         -bash
-  ec2-user  1958  1935  0 15:14 pts/2    00:00:00           unshare --user --fork /usr/bin/bash
-  ec2-user  1959  1958  0 15:14 pts/2    00:00:00             /usr/bin/bash
+  ec2-user  2261  1935  0 15:37 pts/2    00:00:00           /usr/bin/bash
   以下略
   ```
 ### (4) Console2 新しいユーザー名前空間で実行ユーザをrootにマッピングする
@@ -164,8 +161,7 @@ echo "0 ${ExeGID} 1" > /proc/${ChildPID}/gid_map
   nfsnobo+  1900  3469  0 15:13 ?        00:00:00     sshd: ec2-user [priv]
   root      1934  1900  0 15:13 ?        00:00:00       sshd: ec2-user@pts/2
   root      1935  1934  0 15:13 pts/2    00:00:00         -bash
-  root      1958  1935  0 15:14 pts/2    00:00:00           unshare --user --fork /usr/bin/bash
-  root      1959  1958  0 15:14 pts/2    00:00:00             /usr/bin/bash
+  root      2261  1935  0 15:37 pts/2    00:00:00           /usr/bin/bash
   以下略
   ```
 - Console2実行例
@@ -178,8 +174,7 @@ echo "0 ${ExeGID} 1" > /proc/${ChildPID}/gid_map
   root      1900  3469  0 15:13 ?        00:00:00     sshd: ec2-user [priv]
   ec2-user  1934  1900  0 15:13 ?        00:00:00       sshd: ec2-user@pts/2
   ec2-user  1935  1934  0 15:13 pts/2    00:00:00         -bash
-  ec2-user  1958  1935  0 15:14 pts/2    00:00:00           unshare --user --fork /usr/bin/bash
-  ec2-user  1959  1958  0 15:14 pts/2    00:00:00             /usr/bin/bash
+  ec2-user  2261  1935  0 15:37 pts/2    00:00:00           /usr/bin/bash
   以下略
   ```
 ### (5) Console1 unshareコマンドでrootへのユーザマッピングを試す
@@ -190,17 +185,30 @@ exit
 id   #ec2-userに戻っていることを確認します。
 
 #unshareコマンドでrootユーザのマッピングもまとめて実施
-unshare --user --map-root-user --fork /usr/bin/bash
+unshare --user --map-root-user /usr/bin/bash
 
 id
 ps -efH
 ```
+### (5) Console1 プロセスを終了する
+次のハンズオンのためにbashを終了します。
+```shell
+#次の作業のために一旦bashを終了します。
+exit
+id   #ec2-userに戻っていることを確認します。
+```
+
+## Step.2 ホスト名の名前空間を分離する
+###(1) ホスト名のなまえ
 
 
-unshareのコマンドを確認する
 
+## Step.2 プロセス空間を分離する
 
-## Step.2 ユーザー空間を分離する
+```shell
+unshare --user --map-root-user --pid --mount-proc --fork /usr/bin/bash
+```
+
 
 ## Step.3 マウントポイントを分離する
 
