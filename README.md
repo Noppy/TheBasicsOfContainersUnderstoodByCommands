@@ -286,7 +286,15 @@ ps -efH
   ```
 
 
-## Step.3 マウントポイントを分離する
+## Step.4 マウントポイントを分離する
+
+
+fallocate -l 100M rootfs.dat
+mkfs -t xfs rootfs.dat
+mkdir container_mnt
+sudo mount -t xfs -o loop ./rootfs.dat ./container_mnt/
+
+sudo  cp -aR /usr/ /lib /lib64 /etc /var ./container_mnt/
 
 
 
