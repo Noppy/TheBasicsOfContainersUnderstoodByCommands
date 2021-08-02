@@ -88,7 +88,7 @@ Run a program with some namespaces unshared from the parent.
 
 詳しくは unshare(1) をお読みください。
 ```
-### (2) Console1 新しいユーザー名前空間でとりあえず子プロセスを起動する
+### (2) Console1 新しいユーザー名前空間でbashを起動する
 unshareコマンドを利用して、新しいユーザ名前空間を作成しbashプロセスを起動してみます。
 (この段階ではユーザマッピングは実施していないです)
 実行したら、idコマンドとpsコマンドで実行ユーザやプロセスの状態を確認してみます。
@@ -199,15 +199,77 @@ id   #ec2-userに戻っていることを確認します。
 ```
 
 ## Step.2 ホスト名の名前空間を分離する
-###(1) ホスト名のなまえ
-
-
-
-## Step.2 プロセス空間を分離する
-
+###(1) Console1 新しいホスト名の名前空間でbashを起動しホスト名を変更する
 ```shell
-unshare --user --map-root-user --pid --mount-proc --fork /usr/bin/bash
+#Console1
+unshare --user --map-root-user --uts /usr/bin/bash
+
+#hostnameを確認する
+hostname
+
+#hostnameを変更する
+hostname HOGE
+
+#hostnameを確認する
+hostname
 ```
+###(2) Console2 親プロセス(ホスト)のホスト名が変更されていないことを確認
+```shell
+#Console2
+hostname
+```
+- Console1実行例
+  ```shell
+  # hostname
+  HOGE
+  ```
+- Console2実行例
+  ```shell
+  $ hostname
+  ip-172-31-20-86.ap-northeast-1.compute.internal
+  ```
+### (3) Console1 プロセスを終了する
+次のハンズオンのためにbashを終了します。
+```shell
+#次の作業のために一旦bashを終了します。
+exit
+id   #ec2-userに戻っていることを確認します。
+```
+
+
+
+## Step.3 プロセスの名前空間を分離する
+###(1) Console1 新しいプロセスの名前空間でbashを起動する
+```shell
+unshare --user --map-root-user --uts --pid --mount-proc --fork /usr/bin/bash
+
+ps -efH
+```
+###(2)Console2 親プロセス(ホスト)でプロセスの状態を確認する
+```shell
+ps -efH
+```
+- Console1実行例
+  ```shell
+  # ps -efH
+  UID        PID  PPID  C STIME TTY          TIME CMD
+  root         1     0  0 15:52 pts/4    00:00:00 /usr/bin/bash
+  root        16     1  0 15:52 pts/4    00:00:00   ps -efH
+  ```
+- Console2実行例
+  ```shell
+  $ ps -efH
+  UID        PID  PPID  C STIME TTY          TIME CMD
+  root         2     0  0 12:22 ?        00:00:00 [kthreadd]
+  root         4     2  0 12:22 ?        00:00:00   [kworker/0:0H]
+  中略
+  root      2377  3469  0 15:45 ?        00:00:00     sshd: ec2-user [priv]
+  ec2-user  2411  2377  0 15:45 ?        00:00:00       sshd: ec2-user@pts/4
+  ec2-user  2412  2411  0 15:45 pts/4    00:00:00         -bash
+  ec2-user  2529  2412  0 15:52 pts/4    00:00:00           unshare --user --map-root-user --uts --p
+  ec2-user  2530  2529  0 15:52 pts/4    00:00:00             /usr/bin/bash
+  以下略
+  ```
 
 
 ## Step.3 マウントポイントを分離する
