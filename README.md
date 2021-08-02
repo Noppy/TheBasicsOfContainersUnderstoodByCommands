@@ -199,7 +199,8 @@ id   #ec2-userに戻っていることを確認します。
 ```
 
 ## Step.2 ホスト名の名前空間を分離する
-###(1) Console1 新しいホスト名の名前空間でbashを起動しホスト名を変更する
+### (1) Console1 新しいホスト名の名前空間でbashを起動しホスト名を変更する
+`unshareコマンド`の`--uts`オプションで、ホスト名やNISドメイン名を管理するUTS名前空間を分離することができます。
 ```shell
 #Console1
 unshare --user --map-root-user --uts /usr/bin/bash
@@ -213,7 +214,7 @@ hostname HOGE
 #hostnameを確認する
 hostname
 ```
-###(2) Console2 親プロセス(ホスト)のホスト名が変更されていないことを確認
+### (2) Console2 親プロセス(ホスト)のホスト名が変更されていないことを確認
 ```shell
 #Console2
 hostname
@@ -235,17 +236,30 @@ hostname
 exit
 id   #ec2-userに戻っていることを確認します。
 ```
+### (4) (Option) Console1 UTS名前空間を分離しない状況でhostnameを変更してみる
+`--uts`オプションを付けずに親プロセスと同じUTS名前空間でホスト名を変更実行した場合は、親プロセスの空間ではrootユーザーでないことからホスト名変更はエラーとなります。
+```shell
+#Console1
+unshare --user --map-root-user /usr/bin/bash
 
+hostname HOGE
+```
+- Console1実行結果例
+  ```shell
+  # unshare --user --map-root-user /usr/bin/bash
+  # hostname HOGE
+  hostname: you must be root to change the host name
+  ```
 
 
 ## Step.3 プロセスの名前空間を分離する
-###(1) Console1 新しいプロセスの名前空間でbashを起動する
+### (1) Console1 新しいプロセスの名前空間でbashを起動する
 ```shell
 unshare --user --map-root-user --uts --pid --mount-proc --fork /usr/bin/bash
 
 ps -efH
 ```
-###(2)Console2 親プロセス(ホスト)でプロセスの状態を確認する
+### (2)Console2 親プロセス(ホスト)でプロセスの状態を確認する
 ```shell
 ps -efH
 ```
