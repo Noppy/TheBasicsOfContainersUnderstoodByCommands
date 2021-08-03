@@ -287,7 +287,7 @@ ps -efH
 ## Step.4 マウントポイントを分離する
 dockerでは、CoW(Copy-On-Write)新しくファイルシステムを
 
-### (1)ファイルシステムの作成とデータコピー
+### (1)Console1 ファイルシステムの作成とデータコピー
 まず、overlayfsのベースとなるReadOnly用のファイルシステムと中身を作ります。
 ```shell
 TMP_ROOT="./tmp_mnt/"
@@ -323,7 +323,7 @@ sudo chown -R ec2-user:ec2-user ${TMP_ROOT}/dev/
 #ファイルシステムをumountする
 sudo umount ${TMP_ROOT}
 ```
-### (2)overlayfsのマウントテスト
+### (2)Console1 overlayfsのマウントテスト
 まずは名前空間を分離しない状態でoverlayfsの動作を確認します。
 マウントしてファイルを追加して、追加したファイルがupperレイヤーに保管されることを確認します。
 ```shell
@@ -339,7 +339,7 @@ echo ${CONTAINER_ROOT} ${ROOTFS_FILE}
 #overlayでのマウント
 mkdir -p ${CONTAINER_ROOT}/{lower,upper,work,merged}                 #Overlay対象ディレクトリとマウントポイントの作成
 sudo mount -t xfs -o loop,ro ${ROOTFS_FILE} ${CONTAINER_ROOT}/lower  #先ほど作成したファイルシステムをReadOnlyでlowerにマウント
-sudo mount -t overlay overlay -olowerdir=${CONTAINER_ROOT}/lower,upperdir=${CONTAINER_ROOT}/upper,workdir=${CONTAINER_ROOT}/work ${CONTAINER_ROOT}/merged
+sudo mount -t overlay -olowerdir=${CONTAINER_ROOT}/lower,upperdir=${CONTAINER_ROOT}/upper,workdir=${CONTAINER_ROOT}/work overlay ${CONTAINER_ROOT}/merged
 
 #マウント状況の確認
 mount | grep -e '^overlay'
@@ -361,47 +361,69 @@ sudo umount ${CONTAINER_ROOT}/merged
 sudo umount ${CONTAINER_ROOT}/lower
 ```
 
-### (3)新しいマウント名前空間でのプロセス起動とchroot
+### (3)Console1 新しいマウント名前空間でのプロセス起動とルートファイルシステムの変更
 ```shell
+#Console1
 #実行ユーザとカレントディレクトリの確認
 cd ~
 id    #UID=1000(ec2-user), GID=1000(ec2-user)であることを確認
 pwd   #/home/ec2-userであることを確認
 
 #overlayfsのマウント作業
-CONTAINER_ROOT="./overlay_mnt/"
+OVERRAYDIR="./overlay_mnt/"
 ROOTFS_FILE="./rootfs.dat"
-echo ${CONTAINER_ROOT} ${ROOTFS_FILE}
+echo ${OVERRAYDIR} ${ROOTFS_FILE}
 
 #overlayでのマウント
-mkdir -p ${CONTAINER_ROOT}/{lower,upper,work,merged}                 #Overlay対象ディレクトリとマウントポイントの作成
-sudo mount -t xfs -o loop,ro ${ROOTFS_FILE} ${CONTAINER_ROOT}/lower  #先ほど作成したファイルシステムをReadOnlyでlowerにマウント
-sudo mount -t overlay overlay -olowerdir=${CONTAINER_ROOT}/lower,upperdir=${CONTAINER_ROOT}/upper,workdir=${CONTAINER_ROOT}/work ${CONTAINER_ROOT}/merged
+mkdir -p ${OVERRAYDIR}/{lower,upper,work,merged}                 #Overlay対象ディレクトリとマウントポイントの作成
+sudo mount -t xfs -o loop,ro ${ROOTFS_FILE} ${OVERRAYDIR}/lower  #先ほど作成したファイルシステムをReadOnlyでlowerにマウント
+sudo mount -t overlay -olowerdir=${OVERRAYDIR}/lower,upperdir=${OVERRAYDIR}/upper,workdir=${OVERRAYDIR}/work overlay ${OVERRAYDIR}/merged
+
 
 #新しいマウント名前空間でプロセスを起動する
 unshare --user --map-root-user --uts --pid --fork --mount /usr/bin/bash
 
-cd ./overlay_mnt/merged
-mkdir -p .old 
+#ルートファイルシステムの変更(pivot_rootによる変更)
+ROOTDIR="$(pwd)/overlay_mnt/merged"
+mount --make-private /               #マウントポイントを共有しないようにする
+mount --bind ${ROOTDIR} ${ROOTDIR}   #pivot_rootのためのbind処理(これを実行しないとpivot_rootがエラーになる)
+cd ${ROOTDIR}                        #処理の簡素化のため新しいrootに移動
+mkdir -p .old                        #既存のルートファイルシステムの待避先のマウントポイント
+pivot_root . .old                    #ルートファイルシステムの変更(ここが肝)
+cd /
 
-
-
-mount --bind ${ROOTDIR} ${ROOTDIR}     #rootマウントのバインド
-mkdir ${ROOTDIR}/.old                  #現行マウントポイントの対比先
-pivot_root ${ROOTDIR} ${ROOTDIR}/.old  #カレンとプロセスのrootファイルシステム変更
-
-cd ${ROOTDIR}
-mount -t proc proc ./proc     #/procを利用できるようにマウント
-
-cd ${ROOTDIR}                          
-exec chroot . /usr/bin/bash --login   　#chrootの実行
+mount -t proc proc ./proc  #/procを利用できるようにマウント
+umount --lazy .old         #既存のルートファイルシステムを解除
+rmdir .old                 #不要になったディレクトリの削除
 ```
+### (4)新しいマウント名前空間でのプロセスを動かしてみる
+- Console1 新しいプロセス
+  ```shell
+  #Console1
+  ps -efH
+  pwd
+  mount
+
+  #
+  touch hogehage
+  ls -l
+  ```
+- Console2 親プロセス(ホスト)
+  ```shell
+  mount
+
+  cd overlay_mnt/
+  ls -la merged/
+  ls -la upper
+  ls -la lower
+  ```
 
 # 参考資料
 - https://www.youtube.com/watch?v=8fi7uSYlOdc
 - https://tech.retrieva.jp/entry/2019/06/04/130134
 - https://blog.framinal.life/entry/2020/04/09/183208
 - https://www.slideshare.net/zembutsu/what-isdockerdoing
+- https://udzura.hatenablog.jp/entry/2018/08/29/210145
 
 overlayfs
 - https://www.kernel.org/doc/html/latest/filesystems/overlayfs.html
