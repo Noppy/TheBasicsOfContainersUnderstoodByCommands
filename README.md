@@ -381,12 +381,16 @@ sudo mount -t overlay overlay -olowerdir=${CONTAINER_ROOT}/lower,upperdir=${CONT
 #新しいマウント名前空間でプロセスを起動する
 unshare --user --map-root-user --uts --pid --fork --mount /usr/bin/bash
 
-ROOTDIR="$(pwd)/overlay_mnt/merged"
-mount --bind . .                       #rootマウントのバインド
-mkdir .old                             #現行マウントポイントの対比先
+cd ./overlay_mnt/merged
+mkdir -p .old 
+
+
+
+mount --bind ${ROOTDIR} ${ROOTDIR}     #rootマウントのバインド
+mkdir ${ROOTDIR}/.old                  #現行マウントポイントの対比先
 pivot_root ${ROOTDIR} ${ROOTDIR}/.old  #カレンとプロセスのrootファイルシステム変更
 
-cd /
+cd ${ROOTDIR}
 mount -t proc proc ./proc     #/procを利用できるようにマウント
 
 cd ${ROOTDIR}                          
