@@ -310,7 +310,7 @@ sudo chown -R ec2-user:ec2-user ${TMP_ROOT}
 mkdir ${TMP_ROOT}/{usr,etc,proc,dev}
 cp -a /usr/bin /usr/lssbin /usr/lib /usr/lib64 /usr/libexec /usr/share ${TMP_ROOT}/usr
 cp -a /lib /lib64 /bin ${TMP_ROOT}/
-cp /etc/{passwd,group,filesystems} ${TMP_ROOT}/
+cp /etc/{passwd,group,filesystems} ${TMP_ROOT}/etc/
 
 sudo cp -a /root ${TMP_ROOT}/root
 sudo chown -R ec2-user:ec2-user ${TMP_ROOT}/root
@@ -347,7 +347,8 @@ mount | grep -e '^overlay'
 cd ${CONTAINER_ROOT}/merged
 pwd; ll
 
-touch hoge  #マウントポイント直下にファイルシステムを作ってみる
+#マウントポイント直下にファイルシステムを作って状況を見てみる
+touch hoge  
 ll 
 ll ../lower #lowerレイヤーに作成したファイルがあるか確認(存在しないはず)
 ll ../upper #upperレイヤーに作成したファイルがあるか確認(作成したhogeファイルを確認できる)
@@ -384,7 +385,7 @@ mount --bind ${ROOTDIR} ${ROOTDIR}     #rootマウントのバインド
 mkdir ${ROOTDIR}/.old
 pivot_root ${ROOTDIR} ${ROOTDIR}/.old  #カレンとプロセスのrootファイルシステム変更
 
-mount -t proc proc /proc     #/procを利用できるようにマウント
+mount -t proc proc ./proc     #/procを利用できるようにマウント
 
 cd ${ROOTDIR}                          #chroot先への移動
 exec chroot . /usr/bin/bash --login   　#chrootの実行
