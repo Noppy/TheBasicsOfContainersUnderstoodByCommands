@@ -7,6 +7,13 @@
 こちらを参照　--> [コンテナの作り方「Dockerは裏方で何をしているのか？](https://www.slideshare.net/zembutsu/what-isdockerdoing/27)
 <img src="https://image.slidesharecdn.com/what-is-docker-doing-191213003129/95/docker-27-638.jpg?cb=1576197252">
 
+# ハンズオンの概要
+- Step.0 単純にbashを起動し確認する
+- Step.1 ユーザ名前空間を分離する
+- Step.2 ホスト名の名前空間を分離する
+- Step.3 プロセスの名前空間を分離する
+- Step.4 マウントポイントを分離する(Dockerみたいなoverlay実装あり)
+
 
 # 1.準備
 - Amazon Linux2インスタンスを１つ作成する(インスタンスサイズ不問)
@@ -290,7 +297,7 @@ ps -efH
   ec2-user  2530  2529  0 15:52 pts/4    00:00:00             /usr/bin/bash
   以下略
   ```
-## Step.4 マウントポイントを分離する
+## Step.4 マウントポイントを分離する(Dockerみたいなoverlay実装あり)
 dockerでは、CoW(Copy-On-Write)新しくファイルシステムを
 
 ### (1)Console1 ファイルシステムの作成とデータコピー
