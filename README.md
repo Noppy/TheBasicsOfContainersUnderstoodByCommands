@@ -9,8 +9,8 @@
 
 
 # 1.準備
-- Amazon Linux2インスタンスを作成する(xlarge以上のサイズで作成)
-- コンソールを２画面起動し、それぞれでSSH接続する。
+- Amazon Linux2インスタンスを１つ作成する(インスタンスサイズ不問)
+- コンソールを２画面起動し、それぞれでSSH接続する。(Session Managerでも可)
 ```shell
 ssh ec2-user@<Amazon Linux2のパブリックIPアドレス>
 ```
