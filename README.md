@@ -1,6 +1,12 @@
-# コマンドで理解するコンテナの基礎
+# （ハンズオン）コマンドで理解するコンテナの基礎
 
 # はじめに
+本資料では、シェルコマンドを利用しコンテナもどきを作りながら、コンテナの基礎である「独立した空間でプロセスを動かす」ということを理解していただくことを目的としています。
+
+## コンテナの基礎技術の確認
+こちらを参照　--> [コンテナの作り方「Dockerは裏方で何をしているのか？](https://www.slideshare.net/zembutsu/what-isdockerdoing/27)
+<img src="https://image.slidesharecdn.com/what-is-docker-doing-191213003129/95/docker-27-638.jpg?cb=1576197252">
+
 
 # 1.準備
 - Amazon Linux2インスタンスを作成する(xlarge以上のサイズで作成)
