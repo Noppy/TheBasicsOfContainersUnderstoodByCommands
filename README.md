@@ -307,7 +307,7 @@ sudo chown -R ec2-user:ec2-user ${TMP_ROOT}
 
 #マウントした新しいファイルシステムに、シェルの実行に必要なデータをコピーする
 #(一部Permission deniedが出るが今回は無視する)
-mkdir ${NEW_ROOT}/{usr,etc,proc,dev}
+mkdir ${TMP_ROOT}/{usr,etc,proc,dev}
 cp -a /usr/bin /usr/lssbin /usr/lib /usr/lib64 /usr/libexec /usr/share ${TMP_ROOT}/usr
 cp -a /lib /lib64 /bin ${TMP_ROOT}/
 cp /etc/{passwd,group,filesystems} ${TMP_ROOT}/
@@ -323,30 +323,71 @@ sudo chown -R ec2-user:ec2-user ${TMP_ROOT}/dev/
 sudo umount ${TMP_ROOT}
 ```
 ### (2)overlayfsのマウントテスト
+まずは名前空間を分離しない状態でoverlayfsの動作を確認します。
+マウントしてファイルを追加して、追加したファイルがupperレイヤーに保管されることを確認します。
 ```shell
+#実行ユーザとカレントディレクトリの確認
+cd ~
+id    #UID=1000(ec2-user), GID=1000(ec2-user)であることを確認
+pwd   #/home/ec2-userであることを確認
+
 CONTAINER_ROOT="./overlay_mnt/"
 ROOTFS_FILE="./rootfs.dat"
 echo ${CONTAINER_ROOT} ${ROOTFS_FILE}
 
-#overlay用のファイルシステム作成
-mkdir ${CONTAINER_ROOT}/{lower,upper,work}
+#overlayでのマウント
+mkdir -p ${CONTAINER_ROOT}/{lower,upper,work,merged}                 #Overlay対象ディレクトリとマウントポイントの作成
+sudo mount -t xfs -o loop,ro ${ROOTFS_FILE} ${CONTAINER_ROOT}/lower  #先ほど作成したファイルシステムをReadOnlyでlowerにマウント
+sudo mount -t overlay overlay -olowerdir=${CONTAINER_ROOT}/lower,upperdir=${CONTAINER_ROOT}/upper,workdir=${CONTAINER_ROOT}/work ${CONTAINER_ROOT}/merged
 
-### (2)新しいマウント名前空間でのプロセス起動とchroot
+#マウント状況の確認
+mount | grep -e '^overlay'
+
+#オーバーレイを試してみる
+cd ${CONTAINER_ROOT}/merged
+pwd; ll
+
+touch hoge  #マウントポイント直下にファイルシステムを作ってみる
+ll 
+ll ../lower #lowerレイヤーに作成したファイルがあるか確認(存在しないはず)
+ll ../upper #upperレイヤーに作成したファイルがあるか確認(作成したhogeファイルを確認できる)
+
+#オーバーレイの解除
+#次のchrootに向けて、一度overlayを解除します。
+cd ~
+sudo umount ${CONTAINER_ROOT}/merged
+sudo umount ${CONTAINER_ROOT}/lower
+```
+
+### (3)新しいマウント名前空間でのプロセス起動とchroot
 ```shell
+#実行ユーザとカレントディレクトリの確認
+cd ~
+id    #UID=1000(ec2-user), GID=1000(ec2-user)であることを確認
+pwd   #/home/ec2-userであることを確認
+
+#overlayfsのマウント作業
+CONTAINER_ROOT="./overlay_mnt/"
+ROOTFS_FILE="./rootfs.dat"
+echo ${CONTAINER_ROOT} ${ROOTFS_FILE}
+
+#overlayでのマウント
+mkdir -p ${CONTAINER_ROOT}/{lower,upper,work,merged}                 #Overlay対象ディレクトリとマウントポイントの作成
+sudo mount -t xfs -o loop,ro ${ROOTFS_FILE} ${CONTAINER_ROOT}/lower  #先ほど作成したファイルシステムをReadOnlyでlowerにマウント
+sudo mount -t overlay overlay -olowerdir=${CONTAINER_ROOT}/lower,upperdir=${CONTAINER_ROOT}/upper,workdir=${CONTAINER_ROOT}/work ${CONTAINER_ROOT}/merged
+
 #新しいマウント名前空間でプロセスを起動する
 unshare --user --map-root-user --uts --pid --fork --mount /usr/bin/bash
 
-#rootfsの変更作業
-NEW_ROOT="./container_mnt/"
-mkdir -p ${NEW_ROOT}.old
+ROOTDIR="./overlay_mnt/merged"
+mount --bind ${ROOTDIR} ${ROOTDIR}     #rootマウントのバインド
+mkdir ${ROOTDIR}/.old
+pivot_root ${ROOTDIR} ${ROOTDIR}/.old  #カレンとプロセスのrootファイルシステム変更
 
-mount --bind ${NEW_ROOT} ${NEW_ROOT}     #rootマウントのバインド
-pivot_root ${NEW_ROOT} ${NEW_ROOT}/.old  #カレンとプロセスのrootファイルシステム変更
+mount -t proc proc /proc     #/procを利用できるようにマウント
 
-mount -t proc proc ${NEW_ROOT}/proc      #/procを利用できるようにマウント
-
-cd ${NEW_ROOT}                           #chroot先への移動
-exec chroot . /usr/bin/bash            　　　　#chrootの実行
+cd ${ROOTDIR}                          #chroot先への移動
+exec chroot . /usr/bin/bash --login   　#chrootの実行
 ```
 
 # 参考資料
