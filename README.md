@@ -308,7 +308,7 @@ sudo chown -R ec2-user:ec2-user ${TMP_ROOT}
 #マウントした新しいファイルシステムに、シェルの実行に必要なデータをコピーする
 #(一部Permission deniedが出るが今回は無視する)
 mkdir ${TMP_ROOT}/{usr,etc,proc,dev}
-cp -a /usr/bin /usr/lssbin /usr/lib /usr/lib64 /usr/libexec /usr/share ${TMP_ROOT}/usr
+cp -a /usr/bin /usr/sbin /usr/lib /usr/lib64 /usr/libexec /usr/share ${TMP_ROOT}/usr
 cp -a /lib /lib64 /bin ${TMP_ROOT}/
 cp /etc/{passwd,group,filesystems} ${TMP_ROOT}/etc/
 
@@ -380,14 +380,15 @@ sudo mount -t overlay overlay -olowerdir=${CONTAINER_ROOT}/lower,upperdir=${CONT
 #新しいマウント名前空間でプロセスを起動する
 unshare --user --map-root-user --uts --pid --fork --mount /usr/bin/bash
 
-ROOTDIR="./overlay_mnt/merged"
-mount --bind ${ROOTDIR} ${ROOTDIR}     #rootマウントのバインド
-mkdir ${ROOTDIR}/.old
+ROOTDIR="$(pwd)/overlay_mnt/merged"
+mount --bind . .                       #rootマウントのバインド
+mkdir .old                             #現行マウントポイントの対比先
 pivot_root ${ROOTDIR} ${ROOTDIR}/.old  #カレンとプロセスのrootファイルシステム変更
 
+cd /
 mount -t proc proc ./proc     #/procを利用できるようにマウント
 
-cd ${ROOTDIR}                          #chroot先への移動
+cd ${ROOTDIR}                          
 exec chroot . /usr/bin/bash --login   　#chrootの実行
 ```
 
