@@ -288,6 +288,7 @@ ps -efH
 dockerでは、CoW(Copy-On-Write)新しくファイルシステムを
 
 ### (1)ファイルシステムの作成とデータコピー
+まず、overlayfsのベースとなるReadOnly用のファイルシステムと中身を作ります。
 ```shell
 TMP_ROOT="./tmp_mnt/"
 ROOTFS_FILE="./rootfs.dat"
