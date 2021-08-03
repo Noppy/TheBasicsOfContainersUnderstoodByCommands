@@ -284,35 +284,53 @@ ps -efH
   ec2-user  2530  2529  0 15:52 pts/4    00:00:00             /usr/bin/bash
   以下略
   ```
-
-
 ## Step.4 マウントポイントを分離する
+dockerでは、CoW(Copy-On-Write)新しくファイルシステムを
+
 ### (1)ファイルシステムの作成とデータコピー
 ```shell
-NEW_ROOT="./container_mnt/"
+TMP_ROOT="./tmp_mnt/"
 ROOTFS_FILE="./rootfs.dat"
 echo ${NEW_ROOT} ${ROOTFS_FILE}
 
+#実行ユーザとカレントディレクトリの確認
 cd ~
+id    #UID=1000(ec2-user), GID=1000(ec2-user)であることを確認
+pwd   #/home/ec2-userであることを確認
+
+#マウントするファイルシステムを作成しループバックマウントする
 fallocate -l 2G ${ROOTFS_FILE}
 mkfs -t xfs ${ROOTFS_FILE}
-mkdir ${NEW_ROOT}
-sudo mount -t xfs -o loop ${ROOTFS_FILE} ${NEW_ROOT}
-sudo chown -R ec2-user:ec2-user ${NEW_ROOT}
+mkdir ${TMP_ROOT}
+sudo mount -t xfs -o loop ${ROOTFS_FILE} ${TMP_ROOT}
+sudo chown -R ec2-user:ec2-user ${TMP_ROOT}
 
-
+#マウントした新しいファイルシステムに、シェルの実行に必要なデータをコピーする
+#(一部Permission deniedが出るが今回は無視する)
 mkdir ${NEW_ROOT}/{usr,etc,proc,dev}
-cp -a /usr/bin /usr/sbin /usr/lib /usr/lib64 /usr/libexec /usr/share ${NEW_ROOT}/usr
-cp -a /lib /lib64 /bin ${NEW_ROOT}/
-cp /etc/{passwd,group,filesystems} ${NEW_ROOT}/
+cp -a /usr/bin /usr/lssbin /usr/lib /usr/lib64 /usr/libexec /usr/share ${TMP_ROOT}/usr
+cp -a /lib /lib64 /bin ${TMP_ROOT}/
+cp /etc/{passwd,group,filesystems} ${TMP_ROOT}/
 
-sudo cp -a /root ${NEW_ROOT}/root
-sudo chown -R ec2-user:ec2-user ${NEW_ROOT}/root
+sudo cp -a /root ${TMP_ROOT}/root
+sudo chown -R ec2-user:ec2-user ${TMP_ROOT}/root
 
-sudo mknod -m 666 ${NEW_ROOT}/dev/null c 1 3
-sudo mknod -m 666 ${NEW_ROOT}/dev/zero c 1 5
-sudo chown -R ec2-user:ec2-user ${NEW_ROOT}/dev/
+sudo mknod -m 666 ${TMP_ROOT}/dev/null c 1 3
+sudo mknod -m 666 ${TMP_ROOT}/dev/zero c 1 5
+sudo chown -R ec2-user:ec2-user ${TMP_ROOT}/dev/
+
+#ファイルシステムをumountする
+sudo umount ${TMP_ROOT}
 ```
+### (2)overlayfsのマウントテスト
+```shell
+CONTAINER_ROOT="./overlay_mnt/"
+ROOTFS_FILE="./rootfs.dat"
+echo ${CONTAINER_ROOT} ${ROOTFS_FILE}
+
+#overlay用のファイルシステム作成
+mkdir ${CONTAINER_ROOT}/{lower,upper,work}
+
 ### (2)新しいマウント名前空間でのプロセス起動とchroot
 ```shell
 #新しいマウント名前空間でプロセスを起動する
@@ -331,7 +349,11 @@ cd ${NEW_ROOT}                           #chroot先への移動
 exec chroot . /usr/bin/bash            　　　　#chrootの実行
 ```
 
-# リファレンス
-https://www.youtube.com/watch?v=8fi7uSYlOdc
-https://tech.retrieva.jp/entry/2019/06/04/130134
-https://blog.framinal.life/entry/2020/04/09/183208
+# 参考資料
+- https://www.youtube.com/watch?v=8fi7uSYlOdc
+- https://tech.retrieva.jp/entry/2019/06/04/130134
+- https://blog.framinal.life/entry/2020/04/09/183208
+- https://www.slideshare.net/zembutsu/what-isdockerdoing
+
+overlayfs
+- https://www.kernel.org/doc/html/latest/filesystems/overlayfs.html
