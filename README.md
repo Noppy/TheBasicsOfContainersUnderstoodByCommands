@@ -31,7 +31,7 @@ ssh ec2-user@<Amazon Linux2のパブリックIPアドレス>
 ### (1)Console1 でプロセスを起動し、psコマンドで状態を確認する
 ```shell
 #Console1
-sudo /usr/bin/bash
+/usr/bin/bash
 ps -fH
 ```
 ### (2)Console2 で親プロセス(ホスト)から見たプロセスの状態を確認する
